@@ -4,7 +4,7 @@ from bs4 import BeautifulSoup
 from telegram import Update, Bot
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 from dotenv import load_dotenv
-from datetime import datetime
+from datetime import datetime, time as dtime
 import asyncio
 
 load_dotenv()
@@ -44,24 +44,32 @@ async def send_news_manual(chat_id):
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_news_manual(update.effective_chat.id)
 
-async def daily_task(context: ContextTypes.DEFAULT_TYPE):
-    await send_news_manual(CHAT_ID)
+async def daily_task():
+    while True:
+        now = datetime.now()
+        target = now.replace(hour=8, minute=0, second=0, microsecond=0)
+        if now > target:
+            target = target.replace(day=now.day + 1)
+        wait_seconds = (target - now).total_seconds()
+        await asyncio.sleep(wait_seconds)
+        await send_news_manual(CHAT_ID)
 
 async def main():
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
-    # Команда /start
     app.add_handler(CommandHandler("start", start))
 
-    # Ежедневная задача через JobQueue (встроенная в PTB)
-    job_queue = app.job_queue
-    job_queue.run_daily(daily_task, time=datetime.strptime("08:00", "%H:%M").time())
-
-    # Сразу отправить при старте
+    # Сразу отправить при запуске
     await send_news_manual(CHAT_ID)
+
+    # Запустить задачу авторассылки в фоне
+    asyncio.create_task(daily_task())
 
     print("Бот запущен и ждёт команд...")
     await app.run_polling()
 
+# 🛠️ Исправление здесь:
 if __name__ == '__main__':
-    asyncio.run(main())
+    import nest_asyncio
+    nest_asyncio.apply()   # 👈 добавляем поддержку вложенных event loops (важно для Railway)
+    asyncio.get_event_loop().run_until_complete(main())
