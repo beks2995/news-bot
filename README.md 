@@ -1,0 +1,7 @@
+# Investing News Telegram Bot
+
+Этот бот автоматически парсит экономический календарь с Investing.com и присылает уведомления о важных событиях по USD (FOMC, CPI, GDP, Non-Farm Payrolls) в Telegram.
+
+## Установка
+
+1. Клонировать репозиторий:
