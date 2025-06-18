@@ -14,8 +14,6 @@ CHAT_ID = os.getenv('CHAT_ID')
 
 bot = telegram.Bot(token=TELEGRAM_TOKEN)
 
-KEYWORDS = ['FOMC', 'CPI', 'GDP', 'Nonfarm', 'Non-Farm']
-
 def get_investing_news():
     url = 'https://ru.investing.com/economic-calendar/'
     headers = {'User-Agent': 'Mozilla/5.0'}
@@ -37,9 +35,17 @@ def get_investing_news():
                 title = event.find('td', {'class': 'event'}).get_text(strip=True)
                 time_str = event.find('td', {'class': 'time'}).get_text(strip=True)
                 
-                if any(keyword in title for keyword in KEYWORDS):
-                    news_list.append(f"{time_str} - {title}")
-        except Exception:
+                # Определяем важность события по количеству "звёзд"
+                impact_element = event.find('td', {'class': 'sentiment'})
+                if impact_element:
+                    stars = impact_element.find_all('i', {'class': 'grayFullBullishIcon'})
+                    impact_level = len(stars)
+                else:
+                    impact_level = 0
+
+                if impact_level == 3:  # Только события с 3 звездами
+                    news_list.append(f"{time_str} - {title} (★★★)")
+        except Exception as e:
             continue
 
     return news_list
@@ -47,10 +53,10 @@ def get_investing_news():
 def send_news():
     news = get_investing_news()
     if news:
-        message = "📌 *Сегодня важные события по USD:*\n\n" + "\n".join(news)
+        message = "📌 *Сегодня важные события по USD (Важность: 3 звезды):*\n\n" + "\n".join(news)
         bot.send_message(chat_id=CHAT_ID, text=message, parse_mode=telegram.ParseMode.MARKDOWN)
     else:
-        print("Сегодня нет важных событий.")
+        print("Сегодня нет событий с важностью 3 звезды.")
 
 # Проверять каждый день в 08:00 утра
 schedule.every().day.at("08:00").do(send_news)
