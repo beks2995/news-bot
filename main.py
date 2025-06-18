@@ -1,16 +1,20 @@
 import os
 import requests
 from bs4 import BeautifulSoup
-from telegram import Bot
+from telegram import Update, Bot
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 from dotenv import load_dotenv
 import schedule
+import asyncio
 import time
 from datetime import datetime
-import asyncio
 
 load_dotenv()
-bot = Bot(token=os.getenv("TELEGRAM_TOKEN"))
+
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
+
+bot = Bot(token=TELEGRAM_TOKEN)
 
 def get_investing_news():
     url = 'https://ru.investing.com/economic-calendar/'
@@ -31,25 +35,43 @@ def get_investing_news():
         except: pass
     return news
 
-async def send_news():
+async def send_news_manual(chat_id):
     news = get_investing_news()
     if news:
         msg = "📌 *Сегодня важные USD‑события (★★★):*\n\n" + "\n".join(news)
     else:
         msg = "Сегодня нет событий с важностью 3 звезды по USD."
-    await bot.send_message(chat_id=CHAT_ID, text=msg, parse_mode="Markdown")
+    await bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown")
 
-def job():
-    asyncio.run(send_news())
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await send_news_manual(update.effective_chat.id)
 
-# 👉 Сразу отправляем новости при старте:
-job()
+async def daily_job():
+    await send_news_manual(CHAT_ID)
 
-# 👉 Планируем отправку каждый день в 08:00:
-schedule.every().day.at("08:00").do(job)
+def run_daily_task():
+    asyncio.run(daily_job())
 
-print("Бот запущен и ждёт следующей проверки...")
+async def main():
+    app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
-while True:
-    schedule.run_pending()
-    time.sleep(60)
+    app.add_handler(CommandHandler("start", start))
+
+    # Ежедневная задача
+    schedule.every().day.at("08:00").do(run_daily_task)
+
+    print("Бот запущен и ждёт команд...")
+
+    # Цикл schedule + polling одновременно
+    async def scheduler():
+        while True:
+            schedule.run_pending()
+            await asyncio.sleep(60)
+
+    await asyncio.gather(
+        app.run_polling(),
+        scheduler()
+    )
+
+if __name__ == '__main__':
+    asyncio.run(main())
