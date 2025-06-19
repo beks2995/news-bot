@@ -11,7 +11,7 @@ load_dotenv()
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
-APP_URL = os.getenv("APP_URL")  # Railway URL, например: https://your-app.up.railway.app
+APP_URL = os.getenv("APP_URL")  # Например: https://your-app.up.railway.app
 
 bot = Bot(token=TELEGRAM_TOKEN)
 
@@ -80,14 +80,12 @@ async def main():
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
 
-    # Установить Webhook
     webhook_url = f"{APP_URL}/webhook"
     await app.bot.set_webhook(webhook_url)
     print(f"Webhook установлен: {webhook_url}")
 
     asyncio.create_task(daily_task())
 
-    # Запустить вебсервер на порту 8080
     await app.run_webhook(
         listen="0.0.0.0",
         port=8080,
@@ -96,6 +94,5 @@ async def main():
     )
 
 if __name__ == '__main__':
-    import nest_asyncio
-    nest_asyncio.apply()
-    asyncio.get_event_loop().run_until_complete(main())
+    import asyncio
+    asyncio.run(main())
