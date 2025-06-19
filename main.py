@@ -87,9 +87,9 @@ async def main():
     asyncio.create_task(daily_task())
 
     await app.run_webhook(
-        listen="0.0.0.0",
-        port=8080,
-        path="/webhook"
+    listen="0.0.0.0",
+    port=8080,
+    webhook_path="/webhook"
     )
 
 if __name__ == '__main__':
