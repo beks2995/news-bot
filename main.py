@@ -11,7 +11,7 @@ load_dotenv()
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
-APP_URL = os.getenv("APP_URL")  # Например: https://your-app.up.railway.app
+APP_URL = os.getenv("APP_URL")  # Railway URL
 
 bot = Bot(token=TELEGRAM_TOKEN)
 
@@ -27,9 +27,9 @@ def get_investing_news_api():
         'X-Requested-With': 'XMLHttpRequest'
     }
     data = {
-        'timeZone': '18',  # UTC+6 для Бишкек
-        'country[]': '5',
-        'importance[]': '3',
+        'timeZone': '18',  # UTC+6 Бишкек
+        'country[]': '5',  # США
+        'importance[]': '3',  # 3 звезды
         'dateFrom': date_today,
         'dateTo': date_tomorrow
     }
@@ -43,7 +43,7 @@ def get_investing_news_api():
     tomorrow_events = []
 
     for ev in soup.find_all('tr', {'event_row': True}):
-        date_attr = ev.get('data-event-datetime')[:10]
+        date_attr = ev.get('data-event-datetime')[:10]  # 'YYYY-MM-DD'
         time = ev.find('td', {'class': 'time'}).get_text(strip=True)
         title = ev.find('td', {'class': 'event'}).get_text(strip=True)
 
@@ -89,16 +89,11 @@ async def main():
     await app.run_webhook(
         listen="0.0.0.0",
         port=8080,
-        url_path="webhook",
+        webhook_path="/webhook",
         webhook_url=webhook_url
     )
 
 if __name__ == '__main__':
     import nest_asyncio
-    import asyncio
-
     nest_asyncio.apply()
-
-    loop = asyncio.get_event_loop()
-    loop.create_task(main())
-    loop.run_forever()
+    asyncio.get_event_loop().run_until_complete(main())
