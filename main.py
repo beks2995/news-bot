@@ -5,6 +5,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 from dotenv import load_dotenv
 from datetime import datetime, timedelta, timezone
 import asyncio
+from bs4 import BeautifulSoup
 
 load_dotenv()
 
@@ -14,7 +15,7 @@ CHAT_ID = os.getenv("CHAT_ID")
 bot = Bot(token=TELEGRAM_TOKEN)
 
 def get_investing_news_api(day_offset=0):
-    tz_offset = 6  # UTC+6 Бишкек
+    tz_offset = 6  # UTC+6 for Bishkek
     date_target = datetime.now(timezone.utc) + timedelta(hours=tz_offset, days=day_offset)
     date_str = date_target.strftime('%Y-%m-%d')
 
@@ -22,30 +23,29 @@ def get_investing_news_api(day_offset=0):
     headers = {
         'User-Agent': 'Mozilla/5.0',
         'Content-Type': 'application/x-www-form-urlencoded',
-        'X-Requested-With': 'XMLHttpRequest'  # <== важно!
+        'X-Requested-With': 'XMLHttpRequest'
     }
     data = {
         'timeZone': '18',  # UTC+6
-        'country[]': '5',  # США
-        'importance[]': '3',  # 3 звезды
+        'country[]': '5',  # USA
+        'importance[]': '3',  # Only 3 stars
         'dateFrom': date_str,
         'dateTo': date_str
     }
 
     response = requests.post(url, headers=headers, data=data)
     if response.status_code != 200:
-        print(f"Ошибка API: {response.status_code} {response.text}")
+        print(f"API Error: {response.status_code} {response.text}")
         return []
 
     try:
         json_data = response.json()
     except Exception as e:
-        print("Ошибка JSON:", e)
-        print("Ответ сервера:", response.text)
+        print("JSON Error:", e)
+        print("Response:", response.text)
         return []
 
     html = json_data.get('data', '')
-    from bs4 import BeautifulSoup
     soup = BeautifulSoup(html, 'lxml')
 
     events = []
@@ -55,7 +55,7 @@ def get_investing_news_api(day_offset=0):
             title = ev.find('td', {'class': 'event'}).get_text(strip=True)
             events.append(f"{time} Бишкек – {title} (★★★)")
         except Exception as e:
-            print("Ошибка обработки события:", e)
+            print("Event parse error:", e)
 
     return events
 
@@ -75,7 +75,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def daily_task():
     while True:
-        now = datetime.utcnow() + timedelta(hours=6)
+        now = datetime.now(timezone.utc) + timedelta(hours=6)  # Bishkek
         target = now.replace(hour=8, minute=0, second=0, microsecond=0)
         if now >= target:
             target += timedelta(days=1)
