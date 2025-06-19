@@ -15,8 +15,8 @@ CHAT_ID = os.getenv("CHAT_ID")
 bot = Bot(token=TELEGRAM_TOKEN)
 
 def get_investing_news_api(day_offset=0):
-    tz_offset = 6  # UTC+6 for Bishkek
-    date_target = datetime.now(timezone.utc) + timedelta(hours=tz_offset, days=day_offset)
+    # Используем чистый UTC день для запроса в API
+    date_target = datetime.now(timezone.utc) + timedelta(days=day_offset)
     date_str = date_target.strftime('%Y-%m-%d')
 
     url = 'https://ru.investing.com/economic-calendar/Service/getCalendarFilteredData'
@@ -26,7 +26,7 @@ def get_investing_news_api(day_offset=0):
         'X-Requested-With': 'XMLHttpRequest'
     }
     data = {
-        'timeZone': '18',  # UTC+6
+        'timeZone': '18',  # UTC+6 для Bishkek
         'country[]': '5',  # USA
         'importance[]': '3',  # Only 3 stars
         'dateFrom': date_str,
