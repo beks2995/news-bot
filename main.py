@@ -14,10 +14,10 @@ CHAT_ID = os.getenv("CHAT_ID")
 
 bot = Bot(token=TELEGRAM_TOKEN)
 
-def get_investing_news_api(day_offset=0):
-    # Используем чистый UTC день для запроса в API
-    date_target = datetime.now(timezone.utc) + timedelta(days=day_offset)
-    date_str = date_target.strftime('%Y-%m-%d')
+def get_investing_news_api():
+    server_now = datetime.now(timezone.utc)
+    date_today = server_now.strftime('%Y-%m-%d')
+    date_tomorrow = (server_now + timedelta(days=1)).strftime('%Y-%m-%d')
 
     url = 'https://ru.investing.com/economic-calendar/Service/getCalendarFilteredData'
     headers = {
@@ -28,40 +28,46 @@ def get_investing_news_api(day_offset=0):
     data = {
         'timeZone': '18',  # UTC+6 для Bishkek
         'country[]': '5',  # USA
-        'importance[]': '3',  # Only 3 stars
-        'dateFrom': date_str,
-        'dateTo': date_str
+        'importance[]': '3',  # Только 3 звезды
+        'dateFrom': date_today,
+        'dateTo': date_tomorrow
     }
 
     response = requests.post(url, headers=headers, data=data)
     if response.status_code != 200:
         print(f"API Error: {response.status_code} {response.text}")
-        return []
+        return [], []
 
     try:
         json_data = response.json()
     except Exception as e:
         print("JSON Error:", e)
         print("Response:", response.text)
-        return []
+        return [], []
 
     html = json_data.get('data', '')
     soup = BeautifulSoup(html, 'lxml')
 
-    events = []
+    today_events = []
+    tomorrow_events = []
+
     for ev in soup.find_all('tr', {'event_row': True}):
         try:
+            date_attr = ev.get('data-event-datetime')[:10]  # пример: '2025-06-20'
             time = ev.find('td', {'class': 'time'}).get_text(strip=True)
             title = ev.find('td', {'class': 'event'}).get_text(strip=True)
-            events.append(f"{time} Бишкек – {title} (★★★)")
-        except Exception as e:
-            print("Event parse error:", e)
 
-    return events
+            if date_attr == date_today:
+                today_events.append(f"{time} Бишкек – {title} (★★★)")
+            elif date_attr == date_tomorrow:
+                tomorrow_events.append(f"{time} Бишкек – {title} (★★★)")
+        except Exception as e:
+            print("Parse error:", e)
+
+    return today_events, tomorrow_events
 
 async def send_news_manual(chat_id):
-    news_today = get_investing_news_api(0)
-    news_tomorrow = get_investing_news_api(1)
+    news_today, news_tomorrow = get_investing_news_api()
 
     msg = "📌 *События USD (★★★) на сегодня по Бишкеку (UTC+6):*\n\n"
     msg += "\n".join(news_today) if news_today else "Сегодня нет событий с важностью 3 звезды по USD."
