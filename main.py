@@ -89,7 +89,7 @@ async def main():
     await app.run_webhook(
     listen="0.0.0.0",
     port=8080,
-    webhook_path="/webhook"
+    path="/webhook",  # для PTB 20.x
     )
 
 if __name__ == '__main__':
