@@ -11,6 +11,7 @@ load_dotenv()
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
+APP_URL = os.getenv("APP_URL")  # Railway URL, например: https://your-app.up.railway.app
 
 bot = Bot(token=TELEGRAM_TOKEN)
 
@@ -26,25 +27,15 @@ def get_investing_news_api():
         'X-Requested-With': 'XMLHttpRequest'
     }
     data = {
-        'timeZone': '18',  # UTC+6 для Bishkek
-        'country[]': '5',  # USA
-        'importance[]': '3',  # Только 3 звезды
+        'timeZone': '18',  # UTC+6 для Бишкек
+        'country[]': '5',
+        'importance[]': '3',
         'dateFrom': date_today,
         'dateTo': date_tomorrow
     }
 
     response = requests.post(url, headers=headers, data=data)
-    if response.status_code != 200:
-        print(f"API Error: {response.status_code} {response.text}")
-        return [], []
-
-    try:
-        json_data = response.json()
-    except Exception as e:
-        print("JSON Error:", e)
-        print("Response:", response.text)
-        return [], []
-
+    json_data = response.json()
     html = json_data.get('data', '')
     soup = BeautifulSoup(html, 'lxml')
 
@@ -52,17 +43,14 @@ def get_investing_news_api():
     tomorrow_events = []
 
     for ev in soup.find_all('tr', {'event_row': True}):
-        try:
-            date_attr = ev.get('data-event-datetime')[:10]  # пример: '2025-06-20'
-            time = ev.find('td', {'class': 'time'}).get_text(strip=True)
-            title = ev.find('td', {'class': 'event'}).get_text(strip=True)
+        date_attr = ev.get('data-event-datetime')[:10]
+        time = ev.find('td', {'class': 'time'}).get_text(strip=True)
+        title = ev.find('td', {'class': 'event'}).get_text(strip=True)
 
-            if date_attr == date_today:
-                today_events.append(f"{time} Бишкек – {title} (★★★)")
-            elif date_attr == date_tomorrow:
-                tomorrow_events.append(f"{time} Бишкек – {title} (★★★)")
-        except Exception as e:
-            print("Parse error:", e)
+        if date_attr == date_today:
+            today_events.append(f"{time} Бишкек – {title} (★★★)")
+        elif date_attr == date_tomorrow:
+            tomorrow_events.append(f"{time} Бишкек – {title} (★★★)")
 
     return today_events, tomorrow_events
 
@@ -81,24 +69,31 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def daily_task():
     while True:
-        now = datetime.now(timezone.utc) + timedelta(hours=6)  # Bishkek
+        now = datetime.now(timezone.utc) + timedelta(hours=6)  # Бишкек
         target = now.replace(hour=8, minute=0, second=0, microsecond=0)
         if now >= target:
             target += timedelta(days=1)
-        wait_seconds = (target - now).total_seconds()
-        await asyncio.sleep(wait_seconds)
+        await asyncio.sleep((target - now).total_seconds())
         await send_news_manual(CHAT_ID)
 
 async def main():
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
-
     app.add_handler(CommandHandler("start", start))
 
-    await send_news_manual(CHAT_ID)
+    # Установить Webhook
+    webhook_url = f"{APP_URL}/webhook"
+    await app.bot.set_webhook(webhook_url)
+    print(f"Webhook установлен: {webhook_url}")
+
     asyncio.create_task(daily_task())
 
-    print("Бот запущен и ждёт команд...")
-    await app.run_polling()
+    # Запустить вебсервер на порту 8080
+    await app.run_webhook(
+        listen="0.0.0.0",
+        port=8080,
+        webhook_path="/webhook",
+        webhook_url=webhook_url
+    )
 
 if __name__ == '__main__':
     import nest_asyncio
